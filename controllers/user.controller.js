@@ -11,16 +11,15 @@ exports.register = async (req, res, next) => {
     const {
       account,
       password,
-      userName,
     } = req.body;
 
-    if (!account && !password && !userName) {
-      return next(appError(400, 'data_missing', next));
+    if (!account && !password) {
+      return next(appError(400, '缺少資料', next));
     }
 
     const userRepeat = await User.findOne({ account });
     if (userRepeat) {
-      return next(appError(400, 'duplicate_user_account', next));
+      return next(appError(400, '重複帳號', next));
     }
     // 產生該帳號的token憑證, 用env中的金鑰
     const token = jwt.sign({ account: account }, process.env.JWT_SECRET);
@@ -29,12 +28,11 @@ exports.register = async (req, res, next) => {
       account: account,
       password: bcryptjs.hashSync(password, 12), // 把密碼加密
       token: token,
-      userName: userName,
     });
 
     successHandler(res, 'success');
   } catch (err) {
-    return next(appError(400, 'request_failed', next));
+    return next(appError(400, '請求失敗', next));
   }
 };
 
@@ -50,13 +48,13 @@ exports.login = async (req, res, next) => {
         if (result) {
           successHandler(res, 'success', { user });
         } else {
-          return next(appError(400, 'password_error', next));
+          return next(appError(400, '密碼錯誤', next));
         }
       });
     } else {
-      return next(appError(404, 'account_not_found', next));
+      return next(appError(404, '找不到帳號', next));
     }
   } catch (err) {
-    return next(appError(400, 'request_failed', next));
+    return next(appError(400, '請求失敗', next));
   }
 };

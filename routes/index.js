@@ -16,6 +16,6 @@ router.post('/login', handleErrorAsync(userController.login));
 // 新增
 router.post('/addText', handleErrorAsync(text.addText));
 // 取得
-router.post('/getText', handleErrorAsync(text.getText));
+router.get('/getText', handleErrorAsync(text.getText));
 
 module.exports = router;

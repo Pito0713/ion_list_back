@@ -10,18 +10,6 @@ const userSchema = new mongoose.Schema(
     token: {
       type: String,
     },
-    userName: {
-      type: String,
-    },
-    oldPassWord: {
-      type: String,
-    },
-    newPassWord: {
-      type: String,
-    },
-    newPassWordAgain: {
-      type: String,
-    },
   },
   {
     versionKey: false,
