@@ -15,7 +15,7 @@ router.post('/login', handleErrorAsync(userController.login));
 // text
 // 新增
 router.post('/addText', handleErrorAsync(text.addText));
-// 取得
-router.get('/getText', handleErrorAsync(text.getText));
+// 搜尋
+router.post('/searchText', handleErrorAsync(text.searchText));
 
 module.exports = router;

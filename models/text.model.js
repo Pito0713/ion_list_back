@@ -1,5 +1,6 @@
 const text = require('body-parser/lib/types/text');
 const mongoose = require('mongoose');
+const { token } = require('morgan');
 const textSchema = new mongoose.Schema(
   {
     file: {
@@ -11,6 +12,12 @@ const textSchema = new mongoose.Schema(
     translation: {
       type: String,
     },
+    searchValue: {
+      type: String,
+    },
+    token: {
+      type: String,
+    }
   },
   {
     versionKey: false,
