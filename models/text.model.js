@@ -17,6 +17,9 @@ const textSchema = new mongoose.Schema(
     },
     token: {
       type: String,
+    },
+    tags: {
+      type: Array,
     }
   },
   {

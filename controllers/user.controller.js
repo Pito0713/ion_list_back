@@ -27,6 +27,7 @@ exports.register = async (req, res, next) => {
     await User.create({
       account: account,
       password: bcryptjs.hashSync(password, 12), // 把密碼加密
+      tags: ['verb', 'noun', 'adjective', 'particle'],
       token: token,
     });
 
@@ -46,7 +47,12 @@ exports.login = async (req, res, next) => {
       // 兩者解密是否對應
       bcryptjs.compare(password, user.password).then((result) => {
         if (result) {
-          successHandler(res, 'success', { user });
+          successHandler(res, 'success', {
+            id: user.id,
+            account: user.account,
+            tags: user.tags,
+            token: user.token,
+          });
         } else {
           return next(appError(400, '密碼錯誤', next));
         }

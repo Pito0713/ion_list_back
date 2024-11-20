@@ -25,11 +25,13 @@ exports.addText = async (req, res, next) => {
     if (!userAccount) {
       return next(appError(404, 'resource_not_found', next));
     }
+    let tags = req.body?.['tags[]']
     const newText = await Text.create({
       file,
       inputs,
       translation,
-      token
+      token,
+      tags,
     });
     successHandler(res, 'success', newText);
   } catch (err) {
@@ -63,7 +65,9 @@ exports.searchText = async (req, res, next) => {
     }
     if (searchValue) {
       target.file = { $regex: searchValue }
-
+    }
+    if (req.body?.['tags[]']?.length > 0) {
+      target.tags = req.body?.['tags[]']
     }
     const searchTarget = await Text.find(target);
     successHandler(res, 'success', searchTarget);

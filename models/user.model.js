@@ -7,6 +7,9 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
     },
+    tags: {
+      type: Array,
+    },
     token: {
       type: String,
     },
