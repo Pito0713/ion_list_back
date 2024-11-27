@@ -20,7 +20,10 @@ const textSchema = new mongoose.Schema(
     },
     tags: {
       type: Array,
-    }
+    },
+    date: {
+      type: Date,
+    },
   },
   {
     versionKey: false,

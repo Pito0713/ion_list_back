@@ -32,6 +32,7 @@ exports.addText = async (req, res, next) => {
       translation,
       token,
       tags,
+      date: Date.now(),
     });
     successHandler(res, 'success', newText);
   } catch (err) {
@@ -69,7 +70,7 @@ exports.searchText = async (req, res, next) => {
     if (req.body?.['tags[]']?.length > 0) {
       target.tags = req.body?.['tags[]']
     }
-    const searchTarget = await Text.find(target);
+    const searchTarget = await Text.find(target).sort({ date: -1 });
     successHandler(res, 'success', searchTarget);
   } catch (err) {
     return next(appError(400, 'request_failed', next));
