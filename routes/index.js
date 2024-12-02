@@ -17,5 +17,9 @@ router.post('/login', handleErrorAsync(userController.login));
 router.post('/addText', handleErrorAsync(text.addText));
 // 搜尋
 router.post('/searchText', handleErrorAsync(text.searchText));
+// upload editText
+router.post('/editText', handleErrorAsync(text.editText));
+//
+router.post('/editTextShowTop', handleErrorAsync(text.editTextShowTop));
 
 module.exports = router;

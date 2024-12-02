@@ -63,18 +63,21 @@ const resErrorDev = (err, res) => {
   });
 };
 
-app.use(function (err, req, res, next) {
-  err.statusCode = err.statusCode || 500;
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  const errorStatusCode = err.errorStatusCode || null; // 獲取自定義錯誤碼
 
-  if (process.env.NODE_ENV === 'dev') {
-    return resErrorDev(err, res);
-  }
-  if (err.name === 'ValidationError') {
-    err.message = '資料欄位未填寫正確，請重新輸入！';
-    err.isOperational = true;
-    return resErrorProd(err, res);
-  }
-  resErrorProd(err, res);
+  // if (process.env.NODE_ENV === 'dev') {
+  //   return resErrorDev(err, res);
+  // }
+  // resErrorProd(err, res);
+
+  res.status(statusCode).json({
+    message: err.message,
+    statusCode,
+    errorStatusCode, // 回傳自定義錯誤碼
+    // isOperational: err.isOperational,
+  });
 });
 
 process.on('unhandledRejection', (err, promise) => {

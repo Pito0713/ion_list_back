@@ -24,6 +24,9 @@ const textSchema = new mongoose.Schema(
     date: {
       type: Date,
     },
+    isShowTop: {
+      type: Boolean,
+    },
   },
   {
     versionKey: false,

@@ -1,5 +1,5 @@
 const User = require('../models/user.model');
-const { successHandler } = require('../server/handle');
+const { successHandler, successDataHandler } = require('../server/handle');
 const appError = require('../server/appError');
 const bcryptjs = require('bcryptjs');
 const request = require('request-promise');
@@ -14,26 +14,26 @@ exports.register = async (req, res, next) => {
     } = req.body;
 
     if (!account && !password) {
-      return next(appError(400, '缺少資料', next));
+      return next(appError(400, 'resource_not_found', next, 1004));
     }
 
     const userRepeat = await User.findOne({ account });
     if (userRepeat) {
-      return next(appError(400, '重複帳號', next));
+      return next(appError(400, 'duplicate_account', next, 1005));
     }
-    // 產生該帳號的token憑證, 用env中的金鑰
+    // 產生該帳號的 token 憑證, 用 env 中的金鑰
     const token = jwt.sign({ account: account }, process.env.JWT_SECRET);
 
     await User.create({
       account: account,
       password: bcryptjs.hashSync(password, 12), // 把密碼加密
-      tags: ['verb', 'noun', 'adjective', 'particle'],
+      tags: ['verb', 'noun', 'adjective', 'particle'], // 預設 tags
       token: token,
     });
 
     successHandler(res, 'success');
   } catch (err) {
-    return next(appError(400, '請求失敗', next));
+    return next(appError(400, 'request_failed', next, 1003));
   }
 };
 
@@ -47,20 +47,20 @@ exports.login = async (req, res, next) => {
       // 兩者解密是否對應
       bcryptjs.compare(password, user.password).then((result) => {
         if (result) {
-          successHandler(res, 'success', {
+          successDataHandler(res, 'success', {
             id: user.id,
             account: user.account,
             tags: user.tags,
             token: user.token,
           });
         } else {
-          return next(appError(400, '密碼錯誤', next));
+          return next(appError(404, 'password_error', next, 1006));
         }
       });
     } else {
-      return next(appError(404, '找不到帳號', next));
+      return next(appError(404, 'account_error', next, 1007));
     }
   } catch (err) {
-    return next(appError(400, '請求失敗', next));
+    return next(appError(400, 'request_failed', next, 1003));
   }
 };

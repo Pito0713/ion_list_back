@@ -1,26 +1,16 @@
-const successHandler = (res, message, data = []) => {
+const successHandler = (res, message) => {
   res.status(200).json({
-    status: "success",
+    status: 1,
+    message: message,
+  });
+};
+
+const successDataHandler = (res, message, data = null) => {
+  res.status(200).json({
+    status: 1,
     message: message,
     data: data,
   });
 };
 
-// 有total參數
-const successTotalHandler = (res, message, data = [], total) => {
-  res.status(200).json({
-    status: "success",
-    message: message,
-    data: data,
-    total: total,
-  });
-};
-
-const errorHandler = (res, message, code = 400) => {
-  res.status(code).json({
-    status: "false",
-    message: message,
-  });
-};
-
-module.exports = { successHandler, errorHandler, successTotalHandler };
+module.exports = { successHandler, successDataHandler };
