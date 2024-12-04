@@ -6,6 +6,9 @@ const textSchema = new mongoose.Schema(
     file: {
       type: String,
     },
+    fileTranslate: {
+      type: String,
+    },
     inputs: {
       type: String,
     },

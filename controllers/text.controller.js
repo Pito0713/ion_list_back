@@ -31,7 +31,7 @@ const authCheck = async (_tokenVale, _next) => {
 // 新增
 exports.addText = async (req, res, next) => {
   try {
-    const { file, inputs, translation } =
+    const { file, inputs, fileTranslate, translation } =
       req.body;
     const authHeader = req.headers['authorization'];
     let userCheck = await authCheck(authHeader, next)
@@ -39,12 +39,13 @@ exports.addText = async (req, res, next) => {
     let tags = req.body?.['tags[]']
     await Text.create({
       file,
+      fileTranslate,
       inputs,
       translation,
       token: userCheck?.token,
       tags,
       date: Date.now(),
-      isShowTop: true, // 預設 true
+      isShowTop: false, // 預設 false
     });
     successHandler(res, 'success');
   } catch (err) {
@@ -62,8 +63,12 @@ exports.searchText = async (req, res, next) => {
     let target = {
       token: userCheck?.token,
     }
+    // 如果有 searchValue，將 file 和 translation 的條件合併
     if (searchValue) {
-      target.file = { $regex: searchValue }
+      target.$or = [
+        { file: { $regex: searchValue } },
+        { translation: { $regex: searchValue } }
+      ];
     }
     if (req.body?.['tags[]']?.length > 0) {
       target.tags = req.body?.['tags[]']
@@ -90,6 +95,7 @@ exports.editText = async (req, res, next) => {
 
     const {
       file,
+      fileTranslate,
       inputs,
       translation,
       _id
@@ -97,6 +103,7 @@ exports.editText = async (req, res, next) => {
     let tags = req.body?.['tags[]']
     await Text.updateOne({ _id: _id }, {
       file: file,
+      fileTranslate: fileTranslate,
       inputs: inputs,
       translation: translation,
       tags: tags,
