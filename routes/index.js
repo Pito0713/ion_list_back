@@ -20,6 +20,11 @@ router.post('/searchText', handleErrorAsync(text.searchText));
 // upload editText
 router.post('/editText', handleErrorAsync(text.editText));
 //
-router.post('/editTextShowTop', handleErrorAsync(text.editTextShowTop));
+
+
+// text
+router.post('/textTest', handleErrorAsync(text.textTest));
+router.post('/answerTest', handleErrorAsync(text.answerTest));
+
 
 module.exports = router;

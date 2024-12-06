@@ -81,7 +81,14 @@ exports.searchText = async (req, res, next) => {
       這樣，field1 按正序排序，field2 按逆序排序
     */
     const searchTarget = await Text.find(target).sort({ isShowTop: -1, date: -1, });
-    successDataHandler(res, 'success', searchTarget);
+
+    const noneToken = searchTarget.map(item => {
+      let newItem = { ...item._doc };  // 淺拷貝資料
+      delete newItem.token;      // 刪除 token 屬性
+      return newItem;
+    });
+
+    successDataHandler(res, 'success', noneToken);
   } catch (err) {
     return next(appError(400, 'request_failed', next, 1003));
   }
@@ -124,7 +131,7 @@ exports.editText = async (req, res, next) => {
 exports.editTextShowTop = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    await authCheck(authHeader)
+    await authCheck(authHeader, next)
 
     const {
       isShowTop,
@@ -139,6 +146,66 @@ exports.editTextShowTop = async (req, res, next) => {
     // }
 
     successHandler(res, 'success');
+  } catch (err) {
+    return next(appError(400, 'request_failed', next, 1003));
+  }
+}
+
+exports.textTest = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    let userCheck = await authCheck(authHeader, next)
+    const dailyText = await Text.aggregate([
+      {
+        $match: {
+          token: userCheck?.token,
+          translation: { $exists: true, $ne: "" } // translation 必須存在且不為空字串
+        }
+      },
+      { $sample: { size: 1 } }
+    ]);
+
+    const targetTag = await Text.aggregate([
+      {
+        $match: {
+          token: userCheck?.token,
+          tags: { $all: dailyText[0].tags }
+        }
+      },
+      { $sample: { size: 3 } }
+    ]);
+    let targetTagArray = targetTag.map((item) => {
+      return item.file
+    })
+
+    targetTagArray.push(dailyText[0].file)
+
+    let finallyText = {
+      _id: dailyText[0]._id,
+      translation: dailyText[0].translation.replace(`${dailyText[0].file}`, `()`),
+      targetTagArray: targetTagArray,
+    }
+
+    successDataHandler(res, 'success', finallyText);
+  } catch (err) {
+    return next(appError(400, 'request_failed', next, 1003));
+  }
+}
+
+exports.answerTest = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    await authCheck(authHeader, next)
+
+    const {
+      file,
+      _id
+    } = req.body;
+    let answer = await Text.findOne({
+      _id: _id,
+    })
+
+    successDataHandler(res, answer.file === file ? 'answer_success' : 'answer_failed', answer.file);
   } catch (err) {
     return next(appError(400, 'request_failed', next, 1003));
   }
