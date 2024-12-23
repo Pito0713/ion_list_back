@@ -15,6 +15,12 @@ const textSchema = new mongoose.Schema(
     translation: {
       type: String,
     },
+    pageNumber: {
+      type: Number,
+    },
+    pageSize: {
+      type: Number,
+    },
     searchValue: {
       type: String,
     },
@@ -33,6 +39,7 @@ const textSchema = new mongoose.Schema(
   },
   {
     versionKey: false,
+    _id: true // 確保 _id 是啟用的 *默認設置
   }
 );
 

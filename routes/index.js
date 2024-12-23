@@ -13,13 +13,17 @@ router.post('/register', handleErrorAsync(userController.register));
 router.post('/login', handleErrorAsync(userController.login));
 
 // text
-// 新增
+// 新增文字
 router.post('/addText', handleErrorAsync(text.addText));
 // 搜尋
 router.post('/searchText', handleErrorAsync(text.searchText));
 // upload editText
 router.post('/editText', handleErrorAsync(text.editText));
-//
+// editTextShowTop
+router.post('/editTextShowTop', handleErrorAsync(text.editTextShowTop));
+// deleteOneText
+router.delete('/deleteOneText', handleErrorAsync(text.deleteOneText));
+
 
 
 // text
