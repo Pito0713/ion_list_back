@@ -3,8 +3,10 @@ const Text = require('../models/text.model');
 const User = require('../models/user.model');
 const appError = require('../server/appError');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const { ObjectId } = mongoose.Types;
 /* 自定義function 確認 JWT token
-  props : {
+  @props : {
     _tokenVale : <String>  // JWT token
     _next : <Function>  // Express send next middleware callback function
   }
@@ -37,7 +39,7 @@ const authCheck = async (_tokenVale, _next) => {
 // @param next {Function} Express Middleware callback function
 exports.addText = async (req, res, next) => {
   try {
-    const { file, inputs, fileTranslate, translation } =
+    const { file, inputs, fileTranslate, translation, fileHiragana } =
       req.body;
 
     // 抓 client 表頭 authorization, 
@@ -49,6 +51,7 @@ exports.addText = async (req, res, next) => {
     await Text.create({
       file: file, // input file <String>
       fileTranslate: fileTranslate,  // input file translation <String>
+      fileHiragana: fileHiragana, // input file Hiragana <String>
       inputs: inputs, // extra inputs <String>
       translation: translation, // sentence or translation <String>
       token: userCheck?.token, // auth token <String> *required
@@ -81,7 +84,7 @@ exports.searchText = async (req, res, next) => {
 
     // 如果有 searchValue，將 file 和 translation 合併條件篩選
     if (searchValue) {
-      target.$or = [
+      target.$or = [ // or 跟其中相關值都撈出來
         { file: { $regex: searchValue } },
         { translation: { $regex: searchValue } }
       ];
@@ -134,6 +137,7 @@ exports.editText = async (req, res, next) => {
     const {
       file,
       fileTranslate,
+      fileHiragana,
       inputs,
       translation,
       _id
@@ -142,6 +146,7 @@ exports.editText = async (req, res, next) => {
     await Text.updateOne({ _id: _id }, {
       file: file,
       fileTranslate: fileTranslate,
+      fileHiragana: fileHiragana,
       inputs: inputs,
       translation: translation,
       tags: tags,
@@ -199,7 +204,7 @@ exports.deleteOneText = async (req, res, next) => {
 
     let targetDelete = await Text.deleteOne({ _id: _id })
     /* 
-      targetDelete :{ 
+      return targetDelete :{ 
         acknowledged: <Boolean> // 資料庫接收到並處理了刪除請求,  
         deletedCount: <Number> //  符合刪除條件的筆數
     }*/
@@ -213,39 +218,88 @@ exports.deleteOneText = async (req, res, next) => {
 }
 
 
+/* ---- 測驗題目
+  從DB資料庫中 隨機取得一個的 Text 文本, 並從 Text 中隨機挑選 3 筆資料
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.textTest = async (req, res, next) => {
   try {
+    // 抓表頭 authorization, 
+    // 自定義 authCheck 判斷是否有 token , return token
     const authHeader = req.headers['authorization'];
     let userCheck = await authCheck(authHeader, next)
-    const dailyText = await Text.aggregate([
+
+    const callRandomTest = (() => {
+      /* ---- 閉包
+        使用閉包私有化 time 計算次數
+        aggregate 超過 3 次回傳請求錯誤
+      */
+      let time = 0
+      return async () => {
+        if (time >= 3) { // check 3 time
+          console.error("失敗次數超過限制");
+          return next(appError(400, 'request_failed', next, 1003));
+        }
+
+        const originalRandomTest = await Text.aggregate([
+          {
+            $match: { // 找出符合的 {token, translation}
+              token: userCheck?.token, // match：user token
+              translation: { $exists: true, $ne: "" } // match：user: 必須存在(exists)且不為(ne)空值
+            }
+          },
+          { $sample: { size: 1 } } // 隨機選取符合條件的 1 筆
+        ])
+        // 檢查替換前後文是否有被調整
+        const replacedString = originalRandomTest[0].translation.replace(`${originalRandomTest[0].file}`, `()`)
+        if (originalRandomTest[0].translation === replacedString) {
+          console.log("替換未發生，originalRandomTest 沒有匹配的內容。");
+          time++; // 失敗增加計數
+          return callRandomTest() // 遞迴重新call
+        } else {
+          // console.log("originalRandomTest 替換成功:", replacedString);
+          return originalRandomTest
+        }
+      };
+    })()
+
+    // 隨機題目
+    const randomTest = await callRandomTest()
+    // 與題目 tag 相關隨機取 3 個不重複的
+    const randomTagTest = await Text.aggregate([
       {
-        $match: {
-          token: userCheck?.token,
-          translation: { $exists: true, $ne: "" } // translation 必須存在且不為空字串
+        $match: { // 找出符合的 {token, tags, file}
+          token: userCheck?.token, // match：user token
+          tags: { $all: randomTest[0].tags }, // match： all date's tag include { randomTest[0].tags }
+          file: { $ne: randomTest[0].file } //  排除 file: { randomTest[0].file } 的值
         }
       },
-      { $sample: { size: 1 } }
+      { $sample: { size: 3 } } // 隨機選取符合條件的 3 筆
     ]);
 
-    const targetTag = await Text.aggregate([
-      {
-        $match: {
-          token: userCheck?.token,
-          tags: { $all: dailyText[0].tags }
-        }
-      },
-      { $sample: { size: 3 } }
-    ]);
-    let targetTagArray = targetTag.map((item) => {
-      return item.file
+    randomTagTest.push(randomTest[0]) // 合併題目
+
+    // 隨機打亂順序
+    function randomArray(array) {
+      const copyArray = [...array]; // 淺拷貝資料
+      for (let i = copyArray.length - 1; i > 0; i--) {
+        const randomIndex = Math.floor(Math.random() * (i + 1)); // random number
+        [copyArray[i], copyArray[randomIndex]] = [copyArray[randomIndex], copyArray[i]]; // JS解構賦值 前後 data 交換
+      }
+      return copyArray;
+    }
+
+    // map 提取所需需要的資料
+    const randomTagTestArray = randomTagTest.map((item) => {
+      return { file: item.file, _id: item._id }
     })
 
-    targetTagArray.push(dailyText[0].file)
-
-    let finallyText = {
-      _id: dailyText[0]._id,
-      translation: dailyText[0].translation.replace(`${dailyText[0].file}`, `()`),
-      targetTagArray: targetTagArray,
+    // 最終題目文本 (含題目跟問題選項)
+    const finallyText = {
+      _id: randomTest[0]._id, // 題目 object id
+      question: randomTest[0].translation.replace(`${randomTest[0].file}`, `()`), // 移除題目所對應單詞的位置
+      randomTagTestArray: randomArray(randomTagTestArray), // 亂數隨機打亂資料
     }
 
     successDataHandler(res, 'success', finallyText);
@@ -255,20 +309,43 @@ exports.textTest = async (req, res, next) => {
   }
 }
 
+/* ---- 測驗題目答案驗證
+  從DB資料庫中找出正確答案資料進行對比, 
+  並且也提取出各個題目選項的翻譯資料進行資料回傳
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.answerTest = async (req, res, next) => {
   try {
+    // 抓表頭 authorization, 
+    // 自定義 authCheck 判斷是否有 token
     const authHeader = req.headers['authorization'];
     await authCheck(authHeader, next)
 
-    const {
-      file,
-      _id
-    } = req.body;
-    let answer = await Text.findOne({
-      _id: _id,
-    })
+    const { file, _id, extraId } = req.body;
 
-    successDataHandler(res, answer.file === file ? 'answer_success' : 'answer_failed', answer.file);
+    // findOne 找出該 req.body._id 題目的值
+    // 該回傳 file 為 **正確答案**
+    let correctAnswer = await Text.findOne(
+      { _id: _id },
+      { file: 1 }) // 顯示 file
+
+    // find 找出題目中所有選項的對應 _id 回傳 file 值
+    let answerFile = await Text.find(
+      { _id: { $in: JSON.parse(extraId).map(item => new ObjectId(item._id)) } }, // 尋找 in 內部 ObjectId 的值
+      { // 需要顯示的的 1 , 不需要的 0
+        file: 1, // 顯示 file
+        fileTranslate: 1, // 顯示 fileTranslate
+        fileHiragana: 1// 顯示 fileHiragana
+      }
+    )
+
+    successDataHandler(res,
+      correctAnswer.file === file ? 'answer_success' : 'answer_failed', // correctAnswer 正確答案是不是與 使用者提交的 file 是否相同
+      {
+        correctAnswer: correctAnswer, // 回傳正確答案
+        answerFile: answerFile // 回傳 題目選項的 file 值
+      });
   } catch (err) {
     console.error(err);
     return next(appError(400, 'request_failed', next, 1003));

@@ -9,6 +9,9 @@ const textSchema = new mongoose.Schema(
     fileTranslate: {
       type: String,
     },
+    fileHiragana: {
+      type: String,
+    },
     inputs: {
       type: String,
     },
