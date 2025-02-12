@@ -351,3 +351,47 @@ exports.answerTest = async (req, res, next) => {
     return next(appError(400, 'request_failed', next, 1003));
   }
 }
+
+
+// 修正
+/* ---- 每日測驗題目
+  紀錄每日測驗的題目, 並且按param 提供順序
+  進來排列
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
+exports.answerDaily = async (req, res, next) => {
+  try {
+    // 抓表頭 authorization, 
+    // 自定義 authCheck 判斷是否有 token
+    const authHeader = req.headers['authorization'];
+    await authCheck(authHeader, next)
+
+    // @param {String} _id
+    const { selectId } = req.body;
+
+    // aggregate 用於 match 條件篩選
+    let dailyTarget = await Text.aggregate([
+      {
+        $match: {
+          _id: { $in: JSON.parse(selectId).map(item => new ObjectId(item)) }// 尋找 in 內部 ObjectId 的值
+        }
+      },
+      {
+        $addFields: {
+          indexId: { $indexOfArray: [JSON.parse(selectId), { $toString: "$_id" }] } // 新增 indexId 計算每個文件在 selectIds 中的索引位置
+        }
+      },
+      {
+        $sort: { indexId: 1 } // 根據 order 排序，1 為升冪，確保按照提供的順序
+      },
+    ])
+
+    if (dailyTarget?.length > 0) successDataHandler(res, 'success', dailyTarget);
+    else return next(appError(404, 'resource_not_found', next, 1008));
+
+  } catch (err) {
+    console.error(err);
+    return next(appError(400, 'request_failed', next, 1003));
+  }
+}

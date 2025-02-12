@@ -31,6 +31,8 @@ router.delete('/deleteOneText', handleErrorAsync(text.deleteOneText));
 router.get('/textTest', handleErrorAsync(text.textTest));
 // 測驗題目答案驗證
 router.post('/answerTest', handleErrorAsync(text.answerTest));
+// 測驗題目答案驗證
+router.post('/answerDaily', handleErrorAsync(text.answerDaily));
 
 
 module.exports = router;
