@@ -39,6 +39,9 @@ const textSchema = new mongoose.Schema(
     isShowTop: {
       type: Boolean,
     },
+    updateDate: {
+      type: Date,
+    },
   },
   {
     versionKey: false,

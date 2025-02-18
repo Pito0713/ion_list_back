@@ -2,7 +2,6 @@ const User = require('../models/user.model');
 const { successHandler, successDataHandler } = require('../server/handle');
 const appError = require('../server/appError');
 const bcryptjs = require('bcryptjs');
-const request = require('request-promise');
 const jwt = require('jsonwebtoken');
 
 // 註冊

@@ -5,12 +5,10 @@ const appError = require('../server/appError');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
-/* 自定義function 確認 JWT token
-  @props : {
-    _tokenVale : <String>  // JWT token
-    _next : <Function>  // Express send next middleware callback function
-  }
-*/
+/* ----- 自定義function 
+  確認 client cookies JWT token
+  @tokenVale : <String>  // JWT token
+  @next : <Function>  // Express send next middleware callback function*/
 const authCheck = async (_tokenVale, _next) => {
   let userAccount = null
 
@@ -21,7 +19,7 @@ const authCheck = async (_tokenVale, _next) => {
 
   // 抓 JWT 並且解碼後去搜尋是否有符合的 account
   const token = _tokenVale && _tokenVale.split(' ')[1];
-  userAccount = await jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+  userAccount = jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
     let account = user?.account
     return await User.findOne({ account })
   })
@@ -33,10 +31,11 @@ const authCheck = async (_tokenVale, _next) => {
   return userAccount ? userAccount : null
 }
 
-// 新增文字
-// @param req {Object} client Request
-// @param res {Object} sever Response
-// @param next {Function} Express Middleware callback function
+/* ---- 新增單字
+  新增 Text 文本資料
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.addText = async (req, res, next) => {
   try {
     const { file, inputs, fileTranslate, translation, fileHiragana } =
@@ -58,6 +57,7 @@ exports.addText = async (req, res, next) => {
       tags: tags, // tags <Array>
       date: Date.now(),
       isShowTop: false, // default data: false
+      updateDate: '', // for updating date
     });
     successHandler(res, 'success');
   } catch (err) {
@@ -66,7 +66,11 @@ exports.addText = async (req, res, next) => {
   }
 };
 
-// 取得
+/* ----  單字搜尋
+  搜尋 Text 文本資料, 並可模糊搜尋 searchValue 對應字
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.searchText = async (req, res, next) => {
   try {
     // 抓表頭 authorization, 
@@ -74,24 +78,32 @@ exports.searchText = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
     let userCheck = await authCheck(authHeader, next)
 
-    const { searchValue, pageNumber, pageSize } = req.body;
-    // @param { String } searchValue
-    // @param { Number } pageNumber
-    // @param { Number } pageSize
+    /*@param { String } searchValue
+      @param { Number } pageNumber
+      @param { Number } pageSize
+      @param { String } sortValue*/
+    const { searchValue, pageNumber, pageSize, sortValue } = req.query;
+
     let target = {
       token: userCheck?.token,
     }
 
+    let orFilter = [];
+
     // 如果有 searchValue，將 file 和 translation 合併條件篩選
     if (searchValue) {
-      target.$or = [ // or 跟其中相關值都撈出來
+      orFilter.push(// or 跟其中相關值都撈出來
         { file: { $regex: searchValue } },
         { translation: { $regex: searchValue } }
-      ];
+      );
     }
-    if (req.body?.['tags[]']?.length > 0) {
-      target.tags = req.body?.['tags[]']
+    if (orFilter.length > 0) {
+      target = { ...target, $or: orFilter };
     }
+    if (req.query?.tags?.length > 0) {
+      target.tags = { $in: req.query.tags } // tags 陣列中包含任一個匹配值
+    }
+
     /* sort 定義結果集排序順序, 1:正序  -1:倒序
       若不指定，則預設為 1，即正序排序
       若要反轉排序，可以設置為 -1，即倒序排序
@@ -100,9 +112,24 @@ exports.searchText = async (req, res, next) => {
       這樣，field1 按正序排序，field2 按逆序排序
     */
     let currentPage = pageNumber - 1
+
+    /* updateDate 更新日期 / isShowTop: 重點置頂*/
+    let sortValueTarget = {}
+    switch (sortValue) {
+      case 'last_updated_reverse':
+        sortValueTarget = { updateDate: 1, date: 1, }
+        break;
+      case 'last_updated_forward':
+        sortValueTarget = { updateDate: -1, date: -1, }
+        break;
+      default:
+        sortValueTarget = { isShowTop: -1, date: -1, }
+        break;
+    }
+
     // find 條件篩選
     const searchTarget = await Text.find(target) // 導入 條件篩選
-      .sort({ isShowTop: -1, date: -1, })
+      .sort(sortValueTarget)
       .skip(currentPage * pageSize) // skip：跳過的筆數，計算公式為 pageNumber * pageSize。 ex: 取第11筆 跳過前面10筆
       .limit(pageSize) // 限制 幾筆
 
@@ -128,7 +155,11 @@ exports.searchText = async (req, res, next) => {
   }
 };
 
-// 修正
+/* ----  修改單字
+  修改指定 _id Text 文本資料
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.editText = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
@@ -150,6 +181,7 @@ exports.editText = async (req, res, next) => {
       inputs: inputs,
       translation: translation,
       tags: tags,
+      updateDate: Date.now(),
     })
 
     // if (targetUpdateOne.upsertedId) {
@@ -164,7 +196,11 @@ exports.editText = async (req, res, next) => {
   }
 }
 
-// 修正
+/* ---- 單字是否置頂
+  指定 _id 單筆 Text 文本資料庫修改 isShowTop param 
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.editTextShowTop = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
@@ -189,7 +225,12 @@ exports.editTextShowTop = async (req, res, next) => {
   }
 }
 
-// 修正
+
+/* ---- 刪除單個單字文本
+  Text 文本資料庫刪除指定 _id 資料
+  @param req {Object} client Request
+  @param res {Object} sever Response
+  @param next {Function} Express Middleware callback function */
 exports.deleteOneText = async (req, res, next) => {
   try {
     // 抓表頭 authorization, 
@@ -198,16 +239,11 @@ exports.deleteOneText = async (req, res, next) => {
     await authCheck(authHeader, next)
 
     // @param {String} _id
-    const {
-      _id
-    } = req.body;
+    const { _id } = req.query;
 
     let targetDelete = await Text.deleteOne({ _id: _id })
-    /* 
-      return targetDelete :{ 
-        acknowledged: <Boolean> // 資料庫接收到並處理了刪除請求,  
-        deletedCount: <Number> //  符合刪除條件的筆數
-    }*/
+    /*@acknowledged: <Boolean> // 資料庫接收到並處理了刪除請求,  
+      @deletedCount: <Number> //  符合刪除條件的筆數*/
     if (targetDelete?.deletedCount > 0) successHandler(res, 'success');
     else return next(appError(404, 'resource_not_found', next, 1008));
 
@@ -217,13 +253,12 @@ exports.deleteOneText = async (req, res, next) => {
   }
 }
 
-
 /* ---- 測驗題目
   從DB資料庫中 隨機取得一個的 Text 文本, 並從 Text 中隨機挑選 3 筆資料
   @param req {Object} client Request
   @param res {Object} sever Response
   @param next {Function} Express Middleware callback function */
-exports.textTest = async (req, res, next) => {
+exports.textQuiz = async (req, res, next) => {
   try {
     // 抓表頭 authorization, 
     // 自定義 authCheck 判斷是否有 token , return token
@@ -315,14 +350,17 @@ exports.textTest = async (req, res, next) => {
   @param req {Object} client Request
   @param res {Object} sever Response
   @param next {Function} Express Middleware callback function */
-exports.answerTest = async (req, res, next) => {
+exports.answerQuiz = async (req, res, next) => {
   try {
     // 抓表頭 authorization, 
     // 自定義 authCheck 判斷是否有 token
     const authHeader = req.headers['authorization'];
     await authCheck(authHeader, next)
 
-    const { file, _id, extraId } = req.body;
+    /*@param { String } file
+    @param { String } _id
+    @param { JSONString } extraId*/
+    const { file, _id, extraId } = req.query;
 
     // findOne 找出該 req.body._id 題目的值
     // 該回傳 file 為 **正確答案**
@@ -352,8 +390,6 @@ exports.answerTest = async (req, res, next) => {
   }
 }
 
-
-// 修正
 /* ---- 每日測驗題目
   紀錄每日測驗的題目, 並且按param 提供順序
   進來排列
@@ -368,7 +404,7 @@ exports.answerDaily = async (req, res, next) => {
     await authCheck(authHeader, next)
 
     // @param {String} _id
-    const { selectId } = req.body;
+    const { selectId } = req.query;
 
     // aggregate 用於 match 條件篩選
     let dailyTarget = await Text.aggregate([
@@ -388,7 +424,7 @@ exports.answerDaily = async (req, res, next) => {
     ])
 
     if (dailyTarget?.length > 0) successDataHandler(res, 'success', dailyTarget);
-    else return next(appError(404, 'resource_not_found', next, 1008));
+    else return next(appError(404, 'daily_resource_not_found', next, 1008));
 
   } catch (err) {
     console.error(err);
