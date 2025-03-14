@@ -313,6 +313,11 @@ exports.textQuiz = async (req, res, next) => {
       { $sample: { size: 3 } } // 隨機選取符合條件的 3 筆
     ]);
 
+    // 如果 tag 隨機撈出資料少於3筆, 回傳空物件
+    if (3 > randomTagTest.length) {
+      return successDataHandler(res, 'success', null);
+    }
+
     randomTagTest.push(randomTest[0]) // 合併題目
 
     // 隨機打亂順序
