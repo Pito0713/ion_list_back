@@ -274,7 +274,7 @@ exports.textQuiz = async (req, res, next) => {
       return async () => {
         if (time >= 3) { // check 3 time
           console.error("失敗次數超過限制");
-          return next(appError(400, 'request_failed', next, 1003));
+          return next(appError(400, 'no_more_data', next, 1003));
         }
 
         const originalRandomTest = await Text.aggregate([
@@ -312,6 +312,11 @@ exports.textQuiz = async (req, res, next) => {
       },
       { $sample: { size: 3 } } // 隨機選取符合條件的 3 筆
     ]);
+
+    // 如果 tag 隨機撈出資料少於3筆, 回傳空物件
+    if (3 > randomTagTest.length) {
+      return successDataHandler(res, 'success', null);
+    }
 
     randomTagTest.push(randomTest[0]) // 合併題目
 
