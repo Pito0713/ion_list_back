@@ -287,20 +287,28 @@ exports.textQuiz = async (req, res, next) => {
           { $sample: { size: 1 } } // 隨機選取符合條件的 1 筆
         ])
         // 檢查替換前後文是否有被調整
-        const replacedString = originalRandomTest[0].translation.replace(`${originalRandomTest[0].file}`, `()`)
-        if (originalRandomTest[0].translation === replacedString) {
-          console.log("替換未發生，originalRandomTest 沒有匹配的內容。");
-          time++; // 失敗增加計數
-          return callRandomTest() // 遞迴重新call
-        } else {
-          // console.log("originalRandomTest 替換成功:", replacedString);
-          return originalRandomTest
+        if (originalRandomTest.length > 0) {
+          const replacedString = originalRandomTest[0]?.translation.replace(`${originalRandomTest[0].file}`, `()`)
+          if (originalRandomTest[0].translation === replacedString) {
+            console.log("替換未發生，originalRandomTest 沒有匹配的內容。");
+            time++; // 失敗增加計數
+            return callRandomTest() // 遞迴重新call
+          } else {
+            // console.log("originalRandomTest 替換成功:", replacedString);
+            return originalRandomTest
+          }
         }
       };
     })()
 
     // 隨機題目
     const randomTest = await callRandomTest()
+
+    if (!randomTest) {
+      return successDataHandler(res, 'no_more_data', null);
+    }
+
+    // 如果 tag 隨機撈出資料少於3筆, 回傳空物件
     // 與題目 tag 相關隨機取 3 個不重複的
     const randomTagTest = await Text.aggregate([
       {
