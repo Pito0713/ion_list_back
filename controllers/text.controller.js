@@ -1,7 +1,7 @@
-const { successHandler, successDataHandler, successDataHandlerTotal } = require('../server/handle');
+const { successStatusHandler, successDataHandler, successDataHandlerTotal } = require('../server/handle');
 const Text = require('../models/text.model');
 const User = require('../models/user.model');
-const appError = require('../server/appError');
+const { appErrorStatusCode } = require('../server/appError');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -14,7 +14,7 @@ const authCheck = async (_tokenVale, _next) => {
 
   // 確保 Authorization 標頭存在 Bearer token 格式
   if (!_tokenVale || !_tokenVale?.startsWith('Bearer ')) {
-    return _next(appError(401, 'Unauthorized', _next, 1001));
+    return _next(appErrorStatusCode(401, 'Unauthorized', _next, 1001));
   }
 
   // 抓 JWT 並且解碼後去搜尋是否有符合的 account
@@ -25,7 +25,7 @@ const authCheck = async (_tokenVale, _next) => {
   })
 
   if (!userAccount) {
-    return _next(appError(401, 'Unauthorized', _next, 1002));
+    return _next(appErrorStatusCode(401, 'Unauthorized', _next, 1002));
   }
 
   return userAccount ? userAccount : null
@@ -59,10 +59,10 @@ exports.addText = async (req, res, next) => {
       isShowTop: false, // default data: false
       updateDate: '', // for updating date
     });
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 };
 
@@ -151,7 +151,7 @@ exports.searchText = async (req, res, next) => {
     );
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 };
 
@@ -185,14 +185,14 @@ exports.editText = async (req, res, next) => {
     })
 
     // if (targetUpdateOne.upsertedId) {
-    //   successHandler(res, 'success');
+    //   successStatusHandler(res, 'success');
     //   return
     // }
 
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 }
 
@@ -214,14 +214,14 @@ exports.editTextShowTop = async (req, res, next) => {
       isShowTop: isShowTop,
     })
     // if (targetUpdateOne.upsertedId) {
-    //   successHandler(res, 'success');
+    //   successStatusHandler(res, 'success');
     //   return
     // }
 
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 }
 
@@ -244,12 +244,12 @@ exports.deleteOneText = async (req, res, next) => {
     let targetDelete = await Text.deleteOne({ _id: _id })
     /*@acknowledged: <Boolean> // 資料庫接收到並處理了刪除請求,  
       @deletedCount: <Number> //  符合刪除條件的筆數*/
-    if (targetDelete?.deletedCount > 0) successHandler(res, 'success');
-    else return next(appError(404, 'resource_not_found', next, 1008));
+    if (targetDelete?.deletedCount > 0) successStatusHandler(res, 'success');
+    else return next(appErrorStatusCode(404, 'resource_not_found', next, 1008));
 
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 }
 
@@ -274,7 +274,7 @@ exports.textQuiz = async (req, res, next) => {
       return async () => {
         if (time >= 3) { // check 3 time
           console.error("失敗次數超過限制");
-          return next(appError(400, 'no_more_data', next, 1003));
+          return next(appErrorStatusCode(400, 'no_more_data', next, 1003));
         }
 
         const originalRandomTest = await Text.aggregate([
@@ -353,7 +353,7 @@ exports.textQuiz = async (req, res, next) => {
     successDataHandler(res, 'success', finallyText);
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 }
 
@@ -399,7 +399,7 @@ exports.answerQuiz = async (req, res, next) => {
       });
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 }
 
@@ -437,10 +437,10 @@ exports.answerDaily = async (req, res, next) => {
     ])
 
     if (dailyTarget?.length > 0) successDataHandler(res, 'success', dailyTarget);
-    else return next(appError(404, 'daily_resource_not_found', next, 1008));
+    else return next(appErrorStatusCode(404, 'daily_resource_not_found', next, 1008));
 
   } catch (err) {
     console.error(err);
-    return next(appError(400, 'request_failed', next, 1003));
+    return next(appErrorStatusCode(400, 'request_failed', next, 1003));
   }
 }
