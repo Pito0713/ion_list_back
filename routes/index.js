@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 const userController = require('../controllers/user.controller');
 const text = require('../controllers/text.controller');
+const grammar = require('../controllers/grammar.controller');
 const handleErrorAsync = require('../server/handleErrorAsync');
 
 // user
@@ -28,5 +29,16 @@ router.get('/answerQuiz', handleErrorAsync(text.answerQuiz));
 // 每日測驗題目
 router.get('/answerDaily', handleErrorAsync(text.answerDaily));
 
+// grammar
+// 文法搜尋
+router.get('/searchGrammar', handleErrorAsync(grammar.searchGrammar));
+// 新增文法
+router.post('/addGrammar', handleErrorAsync(grammar.addGrammar));
+// 修改文法
+router.post('/editGrammar', handleErrorAsync(grammar.editGrammar));
+// 刪除單個文法
+router.delete('/deleteOneGrammar', handleErrorAsync(grammar.deleteOneGrammar));
+// 文法是否置頂
+router.post('/editGrammarShowTop', handleErrorAsync(grammar.editGrammarShowTop));
 
 module.exports = router;
