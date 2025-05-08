@@ -2,6 +2,7 @@ const { successStatusHandler, successDataHandler, successDataHandlerTotal } = re
 const Text = require('../models/text.model');
 const User = require('../models/user.model');
 const { appErrorStatusCode } = require('../server/appError');
+const Grammar = require('../models/grammar.model');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
@@ -277,56 +278,100 @@ exports.textQuiz = async (req, res, next) => {
           return next(appErrorStatusCode(400, 'no_more_data', next, 1003));
         }
 
-        const originalRandomTest = await Text.aggregate([
-          {
-            $match: { // 找出符合的 {token, translation}
-              token: userCheck?.token, // match：user token
-              translation: { $exists: true, $ne: "" } // match：user: 必須存在(exists)且不為(ne)空值
+        // 單字題目篩選
+        const textGroup = async () => {
+          const originalRandomTest = await Text.aggregate([
+            {
+              $match: { // 找出符合的 {token, translation}
+                token: userCheck?.token, // match：user token
+                translation: { $exists: true, $ne: "" } // match：user: 必須存在(exists)且不為(ne)空值
+              }
+            },
+            { $sample: { size: 1 } } // 隨機選取符合條件的 1 筆
+          ])
+          // 檢查替換前後文是否有被調整
+          if (originalRandomTest.length > 0) {
+            const replacedString = originalRandomTest[0]?.translation.replace(`${originalRandomTest[0].file}`, `()`)
+            if (originalRandomTest[0].translation === replacedString) {
+              console.log("替換未發生，originalRandomTest 沒有匹配的內容。");
+              time++; // 失敗增加計數
+              return callRandomTest() // 遞迴重新call
+            } else {
+              return {
+                type: 'text',
+                quiz: originalRandomTest
+              }
             }
-          },
-          { $sample: { size: 1 } } // 隨機選取符合條件的 1 筆
-        ])
-        // 檢查替換前後文是否有被調整
-        if (originalRandomTest.length > 0) {
-          const replacedString = originalRandomTest[0]?.translation.replace(`${originalRandomTest[0].file}`, `()`)
-          if (originalRandomTest[0].translation === replacedString) {
-            console.log("替換未發生，originalRandomTest 沒有匹配的內容。");
-            time++; // 失敗增加計數
-            return callRandomTest() // 遞迴重新call
-          } else {
-            // console.log("originalRandomTest 替換成功:", replacedString);
-            return originalRandomTest
           }
         }
+
+        // 文法題目篩選
+        const grammarGroup = async () => {
+          const originalRandomTest = await Grammar.aggregate([
+            {
+              $match: { // 找出符合的 {token, translation}
+                token: userCheck?.token, // match：user token
+                sentenceInput: { $exists: true, $ne: "" } // match：user: 必須存在(exists)且不為(ne)空值
+              }
+            },
+            { $sample: { size: 1 } } // 隨機選取符合條件的 1 筆
+          ])
+          // 檢查替換前後文是否有被調整
+          if (originalRandomTest.length > 0) {
+            const replacedString = originalRandomTest[0]?.sentenceInput.replace(`${originalRandomTest[0].grammarInput}`, `()`)
+            if (originalRandomTest[0].sentenceInput === replacedString) {
+              console.log("替換未發生，originalRandomTest 沒有匹配的內容。");
+              time++; // 失敗增加計數
+              return callRandomTest() // 遞迴重新call
+            } else {
+              return {
+                type: 'grammar',
+                quiz: originalRandomTest
+              }
+            }
+          }
+        }
+
+        let randomNum = Math.floor(Math.random() * 100) % 2  // 隨機分配文本跟文法題型分配
+        return randomNum === 0 ? grammarGroup() : textGroup()
       };
     })()
 
     // 隨機題目
-    const randomTest = await callRandomTest()
+    const randomQuiz = await callRandomTest()
 
-    if (!randomTest) {
+    if (!randomQuiz) {
       return successDataHandler(res, 'no_more_data', null);
     }
 
-    // 如果 tag 隨機撈出資料少於3筆, 回傳空物件
     // 與題目 tag 相關隨機取 3 個不重複的
-    const randomTagTest = await Text.aggregate([
-      {
-        $match: { // 找出符合的 {token, tags, file}
-          token: userCheck?.token, // match：user token
-          tags: { $all: randomTest[0].tags }, // match： all date's tag include { randomTest[0].tags }
-          file: { $ne: randomTest[0].file } //  排除 file: { randomTest[0].file } 的值
-        }
-      },
-      { $sample: { size: 3 } } // 隨機選取符合條件的 3 筆
-    ]);
+    const randomQuizGroup = randomQuiz.type === 'grammar' ?
+      await Grammar.aggregate([
+        {
+          $match: { // 找出符合的 {token, tags, file}
+            token: userCheck?.token, // match：user token
+            grammarInput: { $ne: randomQuiz.quiz[0].grammarInput } //  排除 file: { randomQuiz[0].file } 的值
+          }
+        },
+        { $sample: { size: 3 } } // 隨機選取符合條件的 3 筆
+      ]) :
+      await Text.aggregate([
+        {
+          $match: { // 找出符合的 {token, tags, file}
+            token: userCheck?.token, // match：user token
+            tags: { $all: randomQuiz.quiz[0].tags }, // match： all date's tag include { randomQuiz[0].tags }
+            file: { $ne: randomQuiz.quiz[0].file } //  排除 file: { randomQuiz[0].file } 的值
+          }
+        },
+        { $sample: { size: 3 } } // 隨機選取符合條件的 3 筆
+      ])
 
     // 如果 tag 隨機撈出資料少於3筆, 回傳空物件
-    if (3 > randomTagTest.length) {
+    if (3 > randomQuizGroup.length) {
       return successDataHandler(res, 'success', null);
     }
 
-    randomTagTest.push(randomTest[0]) // 合併題目
+    randomQuizGroup.push(randomQuiz.quiz[0]) // 合併題目
 
     // 隨機打亂順序
     function randomArray(array) {
@@ -339,15 +384,23 @@ exports.textQuiz = async (req, res, next) => {
     }
 
     // map 提取所需需要的資料
-    const randomTagTestArray = randomTagTest.map((item) => {
-      return { file: item.file, _id: item._id }
-    })
+    const randomTagTestArray =
+      randomQuiz?.type === 'grammar' ?
+        randomQuizGroup.map((item) => {
+          return { file: item.grammarInput, _id: item._id }
+        }) :
+        randomQuizGroup.map((item) => {
+          return { file: item.file, _id: item._id }
+        })
 
     // 最終題目文本 (含題目跟問題選項)
     const finallyText = {
-      _id: randomTest[0]._id, // 題目 object id
-      question: randomTest[0].translation.replace(`${randomTest[0].file}`, `()`), // 移除題目所對應單詞的位置
+      _id: randomQuiz.quiz[0]._id, // 題目 object id
+      question: randomQuiz?.type === 'grammar' ?
+        randomQuiz.quiz[0].sentenceInput.replace(`${randomQuiz.quiz[0].grammarInput}`, `()`) :
+        randomQuiz.quiz[0].translation.replace(`${randomQuiz.quiz[0].file}`, `()`), // 移除題目所對應單詞的位置
       randomTagTestArray: randomArray(randomTagTestArray), // 亂數隨機打亂資料
+      type: randomQuiz?.type
     }
 
     successDataHandler(res, 'success', finallyText);
@@ -373,29 +426,46 @@ exports.answerQuiz = async (req, res, next) => {
     /*@param { String } file
     @param { String } _id
     @param { JSONString } extraId*/
-    const { file, _id, extraId } = req.query;
+    const { file, _id, extraId, type } = req.query;
 
     // findOne 找出該 req.body._id 題目的值
     // 該回傳 file 為 **正確答案**
-    let correctAnswer = await Text.findOne(
-      { _id: _id },
-      { file: 1 }) // 顯示 file
+    let correctAnswer = type === 'text' ?
+      await Text.findOne(
+        { _id: _id },
+        { file: 1 }
+      ) :
+      await Grammar.findOne(
+        { _id: _id },
+        { grammarInput: 1 }
+      );
 
-    // find 找出題目中所有選項的對應 _id 回傳 file 值
-    let answerFile = await Text.find(
-      { _id: { $in: JSON.parse(extraId).map(item => new ObjectId(item._id)) } }, // 尋找 in 內部 ObjectId 的值
-      { // 需要顯示的的 1 , 不需要的 0
-        file: 1, // 顯示 file
-        fileTranslate: 1, // 顯示 fileTranslate
-        fileHiragana: 1// 顯示 fileHiragana
-      }
-    )
+
+    // find 找出題目中所有選項的對應 _id 回傳值
+    let answerFile = type === 'grammar' ?
+      await Grammar.find(
+        { _id: { $in: JSON.parse(extraId).map(item => new ObjectId(item._id)) } }, // 尋找 in 內部 ObjectId 的值
+        { // 需要顯示的的 1 , 不需要的 0
+          grammarInput: 1,
+          grammarTransInput: 1,
+        }
+      ) :
+      await Text.find(
+        { _id: { $in: JSON.parse(extraId).map(item => new ObjectId(item._id)) } }, // 尋找 in 內部 ObjectId 的值
+        { // 需要顯示的的 1 , 不需要的 0
+          file: 1,
+          fileTranslate: 1,
+          fileHiragana: 1
+        }
+      )
+    let targetFile = type === 'grammar' ? correctAnswer.grammarInput : correctAnswer.file
 
     successDataHandler(res,
-      correctAnswer.file === file ? 'answer_success' : 'answer_failed', // correctAnswer 正確答案是不是與 使用者提交的 file 是否相同
+      targetFile === file ? 'answer_success' : 'answer_failed', // correctAnswer 正確答案是不是與 使用者提交的 file 是否相同
       {
         correctAnswer: correctAnswer, // 回傳正確答案
-        answerFile: answerFile // 回傳 題目選項的 file 值
+        answerFile: answerFile, // 回傳 題目選項的 file 值
+        type: type,
       });
   } catch (err) {
     console.error(err);
@@ -419,24 +489,20 @@ exports.answerDaily = async (req, res, next) => {
     // @param {String} _id
     const { selectId } = req.query;
 
-    // aggregate 用於 match 條件篩選
-    let dailyTarget = await Text.aggregate([
-      {
-        $match: {
-          _id: { $in: JSON.parse(selectId).map(item => new ObjectId(item)) }// 尋找 in 內部 ObjectId 的值
-        }
-      },
-      {
-        $addFields: {
-          indexId: { $indexOfArray: [JSON.parse(selectId), { $toString: "$_id" }] } // 新增 indexId 計算每個文件在 selectIds 中的索引位置
-        }
-      },
-      {
-        $sort: { indexId: 1 } // 根據 order 排序，1 為升冪，確保按照提供的順序
-      },
-    ])
+    const selectIdGroup = JSON.parse(selectId)
+    let dailyTarget = await Promise.all(selectIdGroup.map(async (item) => {
+      let answerFile = item.type === 'grammar' ?
+        await Grammar.find(
+          { _id: item._id }, // 尋找 in 內部 ObjectId 的值
+        ) :
+        await Text.find(
+          { _id: item._id }, // 尋找 in 內部 ObjectId 的值
+        )
+      // 給結果加上 type 屬性
+      return { ...answerFile[0]._doc, type: item.type }
+    }))
 
-    if (dailyTarget?.length > 0) successDataHandler(res, 'success', dailyTarget);
+    if (selectIdGroup?.length > 0) successDataHandler(res, 'success', dailyTarget);
     else return next(appErrorStatusCode(404, 'daily_resource_not_found', next, 1008));
 
   } catch (err) {
