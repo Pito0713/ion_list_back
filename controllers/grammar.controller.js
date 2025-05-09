@@ -1,4 +1,4 @@
-const { successHandler, successDataHandlerTotal } = require('../server/handle');
+const { successStatusHandler, successDataHandlerTotal } = require('../server/handle');
 const Grammar = require('../models/grammar.model');
 const User = require('../models/user.model');
 const appError = require('../server/appError');
@@ -54,7 +54,7 @@ exports.addGrammar = async (req, res, next) => {
       isShowTop: false, // default data: false
       updateDate: '', // for updating date
     });
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     console.error(err);
     return next(appError(400, 'request_failed', next, 1003));
@@ -158,11 +158,11 @@ exports.editGrammar = async (req, res, next) => {
     })
 
     // if (targetUpdateOne.upsertedId) {
-    //   successHandler(res, 'success');
+    //   successStatusHandler(res, 'success');
     //   return
     // }
 
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     console.error(err);
     return next(appError(400, 'request_failed', next, 1003));
@@ -187,10 +187,10 @@ exports.editGrammarShowTop = async (req, res, next) => {
       isShowTop: isShowTop,
     })
     // if (targetUpdateOne.upsertedId) {
-    //   successHandler(res, 'success');
+    //   successStatusHandler(res, 'success');
     //   return
     // }
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     console.error(err);
     return next(appError(400, 'request_failed', next, 1003));
@@ -216,7 +216,7 @@ exports.deleteOneGrammar = async (req, res, next) => {
     let targetDelete = await Grammar.deleteOne({ _id: _id })
     /*@acknowledged: <Boolean> // 資料庫接收到並處理了刪除請求,  
       @deletedCount: <Number> //  符合刪除條件的筆數*/
-    if (targetDelete?.deletedCount > 0) successHandler(res, 'success');
+    if (targetDelete?.deletedCount > 0) successStatusHandler(res, 'success');
     else return next(appError(404, 'resource_not_found', next, 1008));
 
   } catch (err) {
