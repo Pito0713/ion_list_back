@@ -1,5 +1,5 @@
 const User = require('../models/user.model');
-const { successHandler, successDataHandler } = require('../server/handle');
+const { successStatusHandler, successDataHandler } = require('../server/handle');
 const appError = require('../server/appError');
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -30,7 +30,7 @@ exports.register = async (req, res, next) => {
       token: token,
     });
 
-    successHandler(res, 'success');
+    successStatusHandler(res, 'success');
   } catch (err) {
     return next(appError(400, 'request_failed', next, 1003));
   }
