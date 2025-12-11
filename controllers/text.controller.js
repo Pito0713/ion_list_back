@@ -331,9 +331,10 @@ exports.textQuiz = async (req, res, next) => {
             }
           }
         }
+        return textGroup()
 
-        let randomNum = Math.floor(Math.random() * 100) % 2  // 隨機分配文本跟文法題型分配
-        return randomNum === 0 ? grammarGroup() : textGroup()
+        // let randomNum = Math.floor(Math.random() * 100) % 2  // 隨機分配文本跟文法題型分配
+        // return randomNum === 0 ? grammarGroup() : textGroup()
       };
     })()
 
